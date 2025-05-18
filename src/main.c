@@ -78,14 +78,14 @@ void test(void *pvParameter)
                      (uint32_t)(addrs[0] >> 32), (uint32_t)addrs[0], temperature);
         }
 
-        if(++send_counter%10 == 0) {
+        average_temperature += temperature + DS18B20_OFFSET;
+        if(++send_counter%30 == 0) {
             char payload_json[32];
-            snprintf(payload_json, sizeof(payload_json), "{\"temperature\": %.2f}", average_temperature/10.0f);
+            snprintf(payload_json, sizeof(payload_json), "{\"temperature\": %.2f}", average_temperature/30.0f);
 
             mqtt_send("/temperature", payload_json);
             average_temperature = 0.0;
         }
-        average_temperature += temperature + DS18B20_OFFSET;
 
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
