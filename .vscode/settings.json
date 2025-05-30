@@ -21,4 +21,7 @@
         "IDF_TARGET": "esp32"
     },
     "cmake.configureOnOpen": false,
+    "cmake.automaticReconfigure": false,
+    "cmake.autoSelectActiveFolder": false,
+    "cmake.configureOnEdit": false,
 }

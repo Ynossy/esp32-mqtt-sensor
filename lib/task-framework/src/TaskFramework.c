@@ -188,6 +188,6 @@ static void EventTimerCallback(TimerHandle_t xTimer)
     /* Callback always called from non-interrupt context so no need
      * to check xPortIsInsideInterrupt
      */
-    ESP_LOGI("TaskFramework", "Send timer event.");
+    // ESP_LOGI("TaskFramework", "Send timer event.");
     TaskSendEvent(t->task, t->event);
 }

@@ -28,13 +28,12 @@ void BlinkTask_Start()
 
 static void EventLoop(uint8_t const event)
 {
-    ESP_LOGI("BlinkTask", "Process Event %d", event);
+    // ESP_LOGI("BlinkTask", "Process Event %d", event);
     switch (event)
     {
     case LED_TOGGLE:
         gpio_set_level(BLINK_GPIO, 1);
         vTaskDelay(100 / portTICK_PERIOD_MS);
-        /* Blink on (output high) */
         gpio_set_level(BLINK_GPIO, 0);
         break;
     default:
