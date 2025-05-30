@@ -18,6 +18,9 @@
 #include "wifilib.h"
 #include "mqtt_lib.h"
 #include "secrets.h"
+#include "BlinkTask.h"
+
+#include "smbus.h"
 
 #ifndef WIFI_SSID
 #error "Please set WIFI_SSID in secrets.h"
@@ -29,12 +32,156 @@
 
 #define BROKER_URL "mqtt://192.168.0.213:1883"
 
-static const gpio_num_t SENSOR_GPIO = GPIO_NUM_25;
+static const gpio_num_t SENSOR_GPIO = GPIO_NUM_25; // IO25/D2
 #define DS18B20_OFFSET -1.0
 
 static const char *TAG = "ds18x20_test";
 
-void test(void *pvParameter)
+#define I2C_MASTER_NUM           I2C_NUM_0
+#define I2C_MASTER_TX_BUF_LEN    0                     // disabled
+#define I2C_MASTER_RX_BUF_LEN    0                     // disabled
+#define I2C_MASTER_FREQ_HZ       50000
+#define I2C_MASTER_SDA_IO        GPIO_NUM_21
+#define I2C_MASTER_SCL_IO        GPIO_NUM_22
+
+static void i2c_master_init(void)
+{
+    int i2c_master_port = I2C_MASTER_NUM;
+    i2c_config_t conf;
+    conf.mode = I2C_MODE_MASTER;
+    conf.sda_io_num = I2C_MASTER_SDA_IO;
+    conf.sda_pullup_en = GPIO_PULLUP_ENABLE;
+    conf.scl_io_num = I2C_MASTER_SCL_IO;
+    conf.scl_pullup_en = GPIO_PULLUP_ENABLE;
+    conf.master.clk_speed = I2C_MASTER_FREQ_HZ;
+    i2c_param_config(i2c_master_port, &conf);
+    i2c_driver_install(i2c_master_port, conf.mode,
+                       I2C_MASTER_RX_BUF_LEN,
+                       I2C_MASTER_TX_BUF_LEN, 0);
+}
+
+
+esp_err_t i2c_read_bytes(const smbus_info_t * smbus_info, uint8_t command, uint8_t * data, size_t len)
+{
+    // Protocol: [S | ADDR | Wr | As | COMMAND | As | Sr | ADDR | Rd | As | (DATAs | A){*len-1} | DATAs | N | P]
+    esp_err_t err = ESP_FAIL;
+
+    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
+    i2c_master_start(cmd);
+    i2c_master_write_byte(cmd, smbus_info->address << 1 | I2C_MASTER_WRITE, true);
+    i2c_master_write_byte(cmd, command, true);
+    i2c_master_start(cmd);
+    i2c_master_write_byte(cmd, smbus_info->address << 1 | I2C_MASTER_READ, true);
+    if (len > 1)
+    {
+        i2c_master_read(cmd, data, len - 1, 0);
+    }
+    i2c_master_read_byte(cmd, &data[len - 1], 1);
+    i2c_master_stop(cmd);
+    err = i2c_master_cmd_begin(smbus_info->i2c_port, cmd, smbus_info->timeout);
+    i2c_cmd_link_delete(cmd);
+
+    return err;
+}
+
+void smbus_task(void *pvParameter)
+{
+     // Set up I2C
+     i2c_master_init();
+     i2c_port_t i2c_num = I2C_MASTER_NUM;
+     uint8_t address = 0x55;
+ 
+     // Set up the SMBus
+     smbus_info_t * smbus_info = smbus_malloc();
+     smbus_init(smbus_info, i2c_num, address);
+     
+     while (1)
+     {
+        for(uint8_t query = 0; query<0x77; query++) // 7 bit address
+        {
+            // uint16_t reg = 0;
+            // esp_err_t r = smbus_read_word(smbus_info, query, &reg);
+            uint8_t reg = 0;
+            esp_err_t r = i2c_read_bytes(smbus_info, query, &reg, 1);
+            if(r == ESP_OK)
+            {
+                ESP_LOGI("SMBUS", "0x%02x: %d",(uint16_t)query, (uint16_t)reg);
+            }
+            else
+            {
+                ESP_LOGI("SMBUS", "Failed to read smbus for address %d: %d", (uint16_t)address ,r);
+            }
+            vTaskDelay(pdMS_TO_TICKS(100));
+        }
+     }
+}
+
+
+// static esp_err_t i2c_master_read_slave_reg(uint8_t i2c_addr, uint8_t i2c_reg, uint8_t* data_rd, size_t size)
+// {
+//     if (size == 0) {
+//         return ESP_OK;
+//     }
+//     i2c_cmd_handle_t cmd = i2c_cmd_link_create();
+//     i2c_master_start(cmd);
+//     // first, send device address (indicating write) & register to be read
+//     i2c_master_write_byte(cmd, ( i2c_addr << 1 ), true);
+//     // send register we want
+//     i2c_master_write_byte(cmd, i2c_reg, true);
+//     // Send repeated start
+//     i2c_master_start(cmd);
+//     // now send device address (indicating read) & read data
+//     i2c_master_write_byte(cmd, ( i2c_addr << 1 ) | I2C_MASTER_READ, true);
+//     if (size > 1) {
+//         i2c_master_read(cmd, data_rd, size - 1, false);
+//     }
+//     i2c_master_read_byte(cmd, data_rd + size - 1, true);
+//     i2c_master_stop(cmd);
+//     esp_err_t ret = i2c_master_cmd_begin(I2C_MASTER_NUM, cmd, pdMS_TO_TICKS(1000));
+//     i2c_cmd_link_delete(cmd);
+//     return ret;
+// }
+
+// void battery_task(void *pvParameter)
+// {
+//     i2c_master_init();
+//     vTaskDelay(pdMS_TO_TICKS(500));
+//     while(1)
+//     {
+//         ESP_LOGI(TAG, "Query I2C device:");
+//         uint8_t data[2] = {0, 0};
+//         esp_err_t ret = i2c_master_read_slave_reg(0x55, 0x09, data, 2);
+//         ESP_LOGI(TAG, "Read value: %d, %d", (uint16_t)data[1], (uint16_t)data[0]);
+//         vTaskDelay(pdMS_TO_TICKS(2000));
+//     }
+// }
+
+
+// void i2cscan_task(void *pvParameter)
+// {
+//     i2c_master_init();
+//     vTaskDelay(pdMS_TO_TICKS(500));
+    
+//     for (uint8_t address = 0x03; address < 0x78; address++) {
+//         ESP_LOGI(TAG, "Scanning I2C bus: %d", (uint16_t)address);
+//         i2c_cmd_handle_t cmd = i2c_cmd_link_create();
+//         i2c_master_start(cmd);
+//         i2c_master_write_byte(cmd, (address << 1) | I2C_MASTER_WRITE, true);
+//         i2c_master_stop(cmd);
+//         esp_err_t ret = i2c_master_cmd_begin(I2C_MASTER_NUM, cmd, pdMS_TO_TICKS(100));
+//         i2c_cmd_link_delete(cmd);
+        
+//         vTaskDelay(pdMS_TO_TICKS(500));
+//         if (ret == ESP_OK) {
+//             ESP_LOGI(TAG, "Found device at 0x%02X\n", address);
+//         }
+//     }
+    
+//     ESP_LOGI(TAG, "Scan ended!");
+//     while(true);
+// }
+
+void ds18x20_task(void *pvParameter)
 {
     // Make sure that the internal pull-up resistor is enabled on the GPIO pin
     // so that one can connect up a sensor without needing an external pull-up.
@@ -175,9 +322,13 @@ void start_mqtt()
 
 void app_main()
 {
-    xTaskCreate(&blink_task, "blink_task", configMINIMAL_STACK_SIZE, NULL, 5, NULL);
-    xTaskCreate(test, TAG, configMINIMAL_STACK_SIZE * 4, NULL, 5, NULL);
+    ESP_LOGI(TAG, "Starting Application...");
+    // xTaskCreate(&blink_task, "blink_task", configMINIMAL_STACK_SIZE, NULL, 5, NULL);
+    // xTaskCreate(&ds18x20_task, TAG, configMINIMAL_STACK_SIZE * 4, NULL, 5, NULL);
+    // xTaskCreate(&smbus_task, TAG, configMINIMAL_STACK_SIZE * 4, NULL, 5, NULL);
 
-    start_wifi();
-    start_mqtt();
+    BlinkTask_Start();
+
+    // start_wifi();
+    // start_mqtt();
 }

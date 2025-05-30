@@ -5,12 +5,20 @@
         "esp_log.h": "c",
         "freertos.h": "c",
         "esp_event.h": "c",
-        "stdint.h": "c"
+        "stdint.h": "c",
+        "inttypes.h": "c",
+        "cstdint": "c",
+        "numbers": "c",
+        "taskframework.h": "c",
+        "smbus.h": "c",
+        "task.h": "c",
+        "timers.h": "c"
     },
     "idf.portWin": "COM3",
     "idf.customExtraVars": {
         "OPENOCD_SCRIPTS": "C:\\Users\\Adrian\\.espressif\\tools\\openocd-esp32\\v0.11.0-esp32-20211220/openocd-esp32/share/openocd/scripts",
         "IDF_CCACHE_ENABLE": "1",
         "IDF_TARGET": "esp32"
-    }
+    },
+    "cmake.configureOnOpen": false,
 }
