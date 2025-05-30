@@ -26,7 +26,10 @@ static void TaskLoop(void *pvParameters)
     }
 }
 
-/*..........................................................................*/
+/**
+ * queueLen: takes the amount of items in the queue, not its byte length
+ * 
+ */
 void TaskStart(Task *const me,
                uint8_t prio, /* priority (1-based) */
                Event *queueSto,

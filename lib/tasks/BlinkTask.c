@@ -20,7 +20,7 @@ void BlinkTask_Start()
     gpio_set_direction(BLINK_GPIO, GPIO_MODE_OUTPUT);
 
     TaskInit(&blinkTask, EventLoop);
-    TaskStart(&blinkTask, 5 /*priority*/, blinkTaskQueue, sizeof(blinkTaskQueue), blinkTaskStack, sizeof(blinkTaskStack));
+    TaskStart(&blinkTask, 5 /*priority*/, blinkTaskQueue, sizeof(blinkTaskQueue) / sizeof(blinkTaskQueue[0]), blinkTaskStack, sizeof(blinkTaskStack));
 
     TimerInit(&timer1s, LED_TOGGLE, &blinkTask, true);
     TimerStart(&timer1s, 1000);
@@ -32,6 +32,7 @@ static void EventLoop(uint8_t const event)
     switch (event)
     {
     case LED_TOGGLE:
+        ESP_LOGI("BlinkTask", "Blink");
         gpio_set_level(BLINK_GPIO, 1);
         vTaskDelay(100 / portTICK_PERIOD_MS);
         gpio_set_level(BLINK_GPIO, 0);
