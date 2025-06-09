@@ -5,6 +5,7 @@
 
 typedef enum
 {
+    BMSTASK_TIMER,
     BMSTASK_EVENT_N
 } BmsTaskEvent;
 
