@@ -2,8 +2,8 @@
 #include <driver/gpio.h>
 #include <esp_log.h>
 #include <driver/i2c_master.h>
-#include "driver/adc.h"
-#include "esp_adc_cal.h"
+#include <esp_adc/adc_oneshot.h>
+#include <esp_adc/adc_cali.h>
 
 static StackType_t sensorTaskStack[4 * configMINIMAL_STACK_SIZE];
 static Event sensorTaskQueue[10];
@@ -66,9 +66,21 @@ i2c_master_dev_handle_t dev_handle;
 // ADC_CHANNEL_6 -> A2/IO34
 // ADC_CHANNEL_7 -> A3/IO37
 
-static esp_adc_cal_characteristics_t adc_chars;
-static const adc_atten_t adc_atten = ADC_ATTEN_DB_12;
-static const adc_unit_t adc_unit = ADC_UNIT_1;
+adc_oneshot_unit_handle_t adc1_handle;
+adc_oneshot_unit_init_cfg_t init_config1 = {
+    .unit_id = ADC_UNIT_1,
+    .ulp_mode = ADC_ULP_MODE_DISABLE,
+};
+adc_oneshot_chan_cfg_t config = {
+    .bitwidth = ADC_BITWIDTH_DEFAULT,
+    .atten = ADC_ATTEN_DB_12,
+};
+adc_cali_handle_t cali_handle;
+adc_cali_line_fitting_config_t cali_config = {
+    .unit_id = ADC_UNIT_1,
+    .atten = ADC_ATTEN_DB_12,
+    .bitwidth = ADC_BITWIDTH_DEFAULT,
+};
 
 /* ---------------------------------------------- */
 
@@ -98,13 +110,14 @@ void SensorTask_Start()
     gpio_set_direction(ADC_V_GPIO, GPIO_MODE_OUTPUT);
 
     // ADC
-    adc1_config_width(ADC_WIDTH_BIT_12);
-    adc1_config_channel_atten(ADC_CHANNEL_0, adc_atten);
-    adc1_config_channel_atten(ADC_CHANNEL_3, adc_atten);
-    adc1_config_channel_atten(ADC_CHANNEL_6, adc_atten);
-    adc1_config_channel_atten(ADC_CHANNEL_7, adc_atten);
-    // Characterize ADC
-    esp_adc_cal_characterize(adc_unit, adc_atten, ADC_WIDTH_BIT_12, 1100, &adc_chars);
+    ESP_ERROR_CHECK(adc_oneshot_new_unit(&init_config1, &adc1_handle));
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, ADC_CHANNEL_0, &config));
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, ADC_CHANNEL_3, &config));
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, ADC_CHANNEL_6, &config));
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, ADC_CHANNEL_7, &config));
+
+    // ADC Calibration values
+    ESP_ERROR_CHECK(adc_cali_create_scheme_line_fitting(&cali_config, &cali_handle));
 
     TaskInit(&sensorTask, EventLoop);
     TaskStart(&sensorTask, 5 /*priority*/, sensorTaskQueue, sizeof(sensorTaskQueue) / sizeof(sensorTaskQueue[0]), sensorTaskStack, sizeof(sensorTaskStack));
@@ -229,14 +242,22 @@ static void ReadBmsRegisters()
 
 static void ReadAdc1()
 {
-    int adc_raw_0 = adc1_get_raw(ADC_CHANNEL_0);
-    int adc_raw_1 = adc1_get_raw(ADC_CHANNEL_3);
-    int adc_raw_2 = adc1_get_raw(ADC_CHANNEL_6);
-    int adc_raw_3 = adc1_get_raw(ADC_CHANNEL_7);
+    int adc_raw_0;
+    int adc_raw_1;
+    int adc_raw_2;
+    int adc_raw_3;
+    adc_oneshot_read(adc1_handle, ADC_CHANNEL_0, &adc_raw_0);
+    adc_oneshot_read(adc1_handle, ADC_CHANNEL_3, &adc_raw_1);
+    adc_oneshot_read(adc1_handle, ADC_CHANNEL_6, &adc_raw_2);
+    adc_oneshot_read(adc1_handle, ADC_CHANNEL_7, &adc_raw_3);
     ESP_LOGI("SensorTask", "raw adc values : %d %d %d %d", adc_raw_0, adc_raw_1, adc_raw_2, adc_raw_3);
-    uint32_t voltage_0 = esp_adc_cal_raw_to_voltage(adc_raw_0, &adc_chars);
-    uint32_t voltage_1 = esp_adc_cal_raw_to_voltage(adc_raw_1, &adc_chars);
-    uint32_t voltage_2 = esp_adc_cal_raw_to_voltage(adc_raw_2, &adc_chars);
-    uint32_t voltage_3 = esp_adc_cal_raw_to_voltage(adc_raw_3, &adc_chars);
-    ESP_LOGI("SensorTask", "cali data: %lu %lu %lu %lu mV", voltage_0, voltage_1, voltage_2, voltage_3);
+    int voltage_0;
+    adc_cali_raw_to_voltage(cali_handle, adc_raw_0, &voltage_0);
+    int voltage_1;
+    adc_cali_raw_to_voltage(cali_handle, adc_raw_1, &voltage_1);
+    int voltage_2;
+    adc_cali_raw_to_voltage(cali_handle, adc_raw_2, &voltage_2);
+    int voltage_3;
+    adc_cali_raw_to_voltage(cali_handle, adc_raw_3, &voltage_3);
+    ESP_LOGI("SensorTask", "cali data: %d %d %d %d mV", voltage_0, voltage_1, voltage_2, voltage_3);
 }
