@@ -5,7 +5,8 @@
 
 typedef enum
 {
-    SENSTASK_TIMER,
+    SENSTASK_TIMER_BMS,
+    SENSTASK_TIMER_ADC,
     SENSTASK_EVENT_N
 } SensorTaskEvent;
 
