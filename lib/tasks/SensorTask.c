@@ -1,11 +1,11 @@
-#include "bmsTask.h"
+#include "sensorTask.h"
 #include <driver/gpio.h>
 #include <esp_log.h>
 #include <driver/i2c_master.h>
 
-static StackType_t bmsTaskStack[4 * configMINIMAL_STACK_SIZE];
-static Event bmsTaskQueue[10];
-static Task bmsTask;
+static StackType_t sensorTaskStack[4 * configMINIMAL_STACK_SIZE];
+static Event sensorTaskQueue[10];
+static Task sensorTask;
 
 static EventTimer timer30s;
 
@@ -67,26 +67,26 @@ static uint16_t bms_value_state_of_charge = 0;     // mAh
 static uint16_t bms_value_max_state_of_charge = 0; // mAh
 static uint16_t bms_value_soc_percent = 0;         // 0-100%
 
-void BmsTask_Start()
+void SensorTask_Start()
 {
-    ESP_LOGI("BmsTask", "Starting BmsTask");
+    ESP_LOGI("SensorTask", "Starting SensorTask");
 
     ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_mst_config, &bus_handle));
     ESP_ERROR_CHECK(i2c_master_bus_add_device(bus_handle, &dev_cfg, &dev_handle));
 
-    TaskInit(&bmsTask, EventLoop);
-    TaskStart(&bmsTask, 5 /*priority*/, bmsTaskQueue, sizeof(bmsTaskQueue) / sizeof(bmsTaskQueue[0]), bmsTaskStack, sizeof(bmsTaskStack));
+    TaskInit(&sensorTask, EventLoop);
+    TaskStart(&sensorTask, 5 /*priority*/, sensorTaskQueue, sizeof(sensorTaskQueue) / sizeof(sensorTaskQueue[0]), sensorTaskStack, sizeof(sensorTaskStack));
 
-    TimerInit(&timer30s, BMSTASK_TIMER, &bmsTask, true);
+    TimerInit(&timer30s, SENSTASK_TIMER, &sensorTask, true);
     TimerStart(&timer30s, 1000);
 }
 
 static void EventLoop(uint8_t const event)
 {
-    ESP_LOGI("BmsTask", "Process Event %d", event);
+    ESP_LOGI("SensorTask", "Process Event %d", event);
     switch (event)
     {
-    case BMSTASK_TIMER:
+    case SENSTASK_TIMER:
     {
         ReadBmsRegisters();
     }
@@ -110,11 +110,11 @@ static void ReadBmsRegisters()
     if (ret == ESP_OK)
     {
         bms_value_temperature = *(uint16_t *)buffer;
-        ESP_LOGI("BmsTask", "Temperature: %u", bms_value_temperature);
+        ESP_LOGI("SensorTask", "Temperature: %u", bms_value_temperature);
     }
     else
     {
-        ESP_LOGE("BmsTask", "Failed to read temperature, code: %d", ret);
+        ESP_LOGE("SensorTask", "Failed to read temperature, code: %d", ret);
         return;
     }
 
@@ -123,11 +123,11 @@ static void ReadBmsRegisters()
     if (ret == ESP_OK)
     {
         bms_value_voltage = *(uint16_t *)buffer;
-        ESP_LOGI("BmsTask", "Voltage: %u", bms_value_voltage);
+        ESP_LOGI("SensorTask", "Voltage: %u", bms_value_voltage);
     }
     else
     {
-        ESP_LOGE("BmsTask", "Failed to read voltage, code: %d", ret);
+        ESP_LOGE("SensorTask", "Failed to read voltage, code: %d", ret);
         return;
     }
 
@@ -136,11 +136,11 @@ static void ReadBmsRegisters()
     if (ret == ESP_OK)
     {
         bms_value_current = *(int16_t *)buffer;
-        ESP_LOGI("BmsTask", "Current: %u", bms_value_current);
+        ESP_LOGI("SensorTask", "Current: %u", bms_value_current);
     }
     else
     {
-        ESP_LOGE("BmsTask", "Failed to read current, code: %d", ret);
+        ESP_LOGE("SensorTask", "Failed to read current, code: %d", ret);
         return;
     }
 
@@ -149,11 +149,11 @@ static void ReadBmsRegisters()
     if (ret == ESP_OK)
     {
         bms_value_state_of_charge = *(uint16_t *)buffer;
-        ESP_LOGI("BmsTask", "SOC mAh: %u", bms_value_state_of_charge);
+        ESP_LOGI("SensorTask", "SOC mAh: %u", bms_value_state_of_charge);
     }
     else
     {
-        ESP_LOGE("BmsTask", "Failed to read soc mAh, code: %d", ret);
+        ESP_LOGE("SensorTask", "Failed to read soc mAh, code: %d", ret);
         return;
     }
 
@@ -162,11 +162,11 @@ static void ReadBmsRegisters()
     if (ret == ESP_OK)
     {
         bms_value_max_state_of_charge = *(uint16_t *)buffer;
-        ESP_LOGI("BmsTask", "Max soc: %u", bms_value_max_state_of_charge);
+        ESP_LOGI("SensorTask", "Max soc: %u", bms_value_max_state_of_charge);
     }
     else
     {
-        ESP_LOGE("BmsTask", "Failed to read max soc, code: %d", ret);
+        ESP_LOGE("SensorTask", "Failed to read max soc, code: %d", ret);
         return;
     }
 
@@ -175,11 +175,11 @@ static void ReadBmsRegisters()
     if (ret == ESP_OK)
     {
         bms_value_soc_percent = buffer[0];
-        ESP_LOGI("BmsTask", "Soc pct: %u", bms_value_soc_percent);
+        ESP_LOGI("SensorTask", "Soc pct: %u", bms_value_soc_percent);
     }
     else
     {
-        ESP_LOGE("BmsTask", "Failed to read soc pct, code: %d", ret);
+        ESP_LOGE("SensorTask", "Failed to read soc pct, code: %d", ret);
         return;
     }
 }

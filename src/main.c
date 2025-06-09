@@ -19,7 +19,7 @@
 #include "mqtt_lib.h"
 #include "secrets.h"
 #include "BlinkTask.h"
-#include "BmsTask.h"
+#include "SensorTask.h"
 
 // #include "smbus.h"
 
@@ -163,7 +163,7 @@ void app_main()
     // xTaskCreate(&ds18x20_task, TAG, configMINIMAL_STACK_SIZE * 4, NULL, 5, NULL);
 
     BlinkTask_Start();
-    BmsTask_Start();
+    SensorTask_Start();
 
     // start_wifi();
     // start_mqtt();
