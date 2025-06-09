@@ -162,9 +162,9 @@ void app_main()
     ESP_LOGI(TAG, "Starting Application...");
     // xTaskCreate(&ds18x20_task, TAG, configMINIMAL_STACK_SIZE * 4, NULL, 5, NULL);
 
+    start_wifi();
+    start_mqtt();
+
     BlinkTask_Start();
     SensorTask_Start();
-
-    // start_wifi();
-    // start_mqtt();
 }

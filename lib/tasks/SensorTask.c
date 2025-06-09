@@ -4,6 +4,7 @@
 #include <driver/i2c_master.h>
 #include <esp_adc/adc_oneshot.h>
 #include <esp_adc/adc_cali.h>
+#include "mqtt_lib.h"
 
 static StackType_t sensorTaskStack[4 * configMINIMAL_STACK_SIZE];
 static Event sensorTaskQueue[10];
@@ -89,6 +90,7 @@ static void EventLoop(uint8_t const event);
 static esp_err_t ReadRegister(uint8_t address, uint8_t *data, size_t len);
 static void ReadBmsRegisters();
 static void ReadAdc1();
+static void SendMqttMessage();
 
 // local variables
 static uint16_t bms_value_temperature = 0;         // millikelvin
@@ -97,6 +99,13 @@ static int16_t bms_value_current = 0;              // milliamps
 static uint16_t bms_value_state_of_charge = 0;     // mAh
 static uint16_t bms_value_max_state_of_charge = 0; // mAh
 static uint16_t bms_value_soc_percent = 0;         // 0-100%
+
+static int adc_channel_0 = 0;
+static int adc_channel_1 = 0;
+static int adc_channel_2 = 0;
+static int adc_channel_3 = 0;
+
+static char mqtt_message_buffer[1024];
 
 void SensorTask_Start()
 {
@@ -126,7 +135,7 @@ void SensorTask_Start()
     TimerStart(&timerBms, 10000);
 
     TimerInit(&timerAdc, SENSTASK_TIMER_ADC, &sensorTask, true);
-    TimerStart(&timerAdc, 1000);
+    TimerStart(&timerAdc, 10000);
 }
 
 static void EventLoop(uint8_t const event)
@@ -145,6 +154,7 @@ static void EventLoop(uint8_t const event)
         vTaskDelay(100 / portTICK_PERIOD_MS);
         ReadAdc1();
         gpio_set_level(ADC_V_GPIO, 0);
+        SendMqttMessage();
     }
     break;
     default:
@@ -251,13 +261,34 @@ static void ReadAdc1()
     adc_oneshot_read(adc1_handle, ADC_CHANNEL_6, &adc_raw_2);
     adc_oneshot_read(adc1_handle, ADC_CHANNEL_7, &adc_raw_3);
     ESP_LOGI("SensorTask", "raw adc values : %d %d %d %d", adc_raw_0, adc_raw_1, adc_raw_2, adc_raw_3);
-    int voltage_0;
-    adc_cali_raw_to_voltage(cali_handle, adc_raw_0, &voltage_0);
-    int voltage_1;
-    adc_cali_raw_to_voltage(cali_handle, adc_raw_1, &voltage_1);
-    int voltage_2;
-    adc_cali_raw_to_voltage(cali_handle, adc_raw_2, &voltage_2);
-    int voltage_3;
-    adc_cali_raw_to_voltage(cali_handle, adc_raw_3, &voltage_3);
-    ESP_LOGI("SensorTask", "cali data: %d %d %d %d mV", voltage_0, voltage_1, voltage_2, voltage_3);
+    adc_cali_raw_to_voltage(cali_handle, adc_raw_0, &adc_channel_0);
+    adc_cali_raw_to_voltage(cali_handle, adc_raw_1, &adc_channel_1);
+    adc_cali_raw_to_voltage(cali_handle, adc_raw_2, &adc_channel_2);
+    adc_cali_raw_to_voltage(cali_handle, adc_raw_3, &adc_channel_3);
+    ESP_LOGI("SensorTask", "cali data: %d %d %d %d mV", adc_channel_0, adc_channel_1, adc_channel_2, adc_channel_3);
+}
+
+static void SendMqttMessage()
+{
+    snprintf(mqtt_message_buffer, sizeof(mqtt_message_buffer),
+             "{\
+\"battery\": \
+{\
+\"temperature\": %u,\
+\"voltage\": %u,\
+\"current\": %d,\
+\"soc_mah\": %u,\
+\"soc_max\": %u,\
+\"soc_pct\": %u\
+},\
+\"plant0\": %d,\
+\"plant1\": %d,\
+\"plant2\": %d,\
+\"plant3\": %d\
+}",
+             bms_value_temperature, bms_value_voltage, bms_value_current,
+             bms_value_state_of_charge, bms_value_max_state_of_charge, bms_value_soc_percent,
+             adc_channel_0, adc_channel_1, adc_channel_2, adc_channel_3);
+
+    mqtt_send("/outdoorstation", mqtt_message_buffer);
 }
