@@ -132,10 +132,10 @@ void SensorTask_Start()
     TaskStart(&sensorTask, 5 /*priority*/, sensorTaskQueue, sizeof(sensorTaskQueue) / sizeof(sensorTaskQueue[0]), sensorTaskStack, sizeof(sensorTaskStack));
 
     TimerInit(&timerBms, SENSTASK_TIMER_BMS, &sensorTask, true);
-    TimerStart(&timerBms, 10000);
+    TimerStart(&timerBms, 30000);
 
     TimerInit(&timerAdc, SENSTASK_TIMER_ADC, &sensorTask, true);
-    TimerStart(&timerAdc, 10000);
+    TimerStart(&timerAdc, 30000);
 }
 
 static void EventLoop(uint8_t const event)
