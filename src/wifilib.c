@@ -155,7 +155,7 @@ esp_err_t wifilib_connect(char* wifi_ssid, char* wifi_password)
     strncpy((char*)wifi_config.sta.ssid, wifi_ssid, sizeof(wifi_config.sta.ssid));
     strncpy((char*)wifi_config.sta.password, wifi_password, sizeof(wifi_config.sta.password));
 
-    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE)); // default is WIFI_PS_MIN_MODEM
+    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_MIN_MODEM)); // default is WIFI_PS_MIN_MODEM
     ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM)); // default is WIFI_STORAGE_FLASH
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));

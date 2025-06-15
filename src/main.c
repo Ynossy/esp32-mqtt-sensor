@@ -20,6 +20,7 @@
 #include "secrets.h"
 #include "BlinkTask.h"
 #include "SensorTask.h"
+#include "esp_pm.h"
 
 // #include "smbus.h"
 
@@ -162,9 +163,20 @@ void app_main()
     ESP_LOGI(TAG, "Starting Application...");
     // xTaskCreate(&ds18x20_task, TAG, configMINIMAL_STACK_SIZE * 4, NULL, 5, NULL);
 
+    
     start_wifi();
     start_mqtt();
-
-    BlinkTask_Start();
+    
+    // set onboard LED to off
+    gpio_set_direction(GPIO_NUM_2, GPIO_MODE_OUTPUT);
+    gpio_set_level(GPIO_NUM_2, 0);
+    // BlinkTask_Start();
     SensorTask_Start();
+
+    esp_pm_config_t pm_config = {
+        .light_sleep_enable = true,
+        .max_freq_mhz = 80,
+        .min_freq_mhz = 10
+    };
+    ESP_ERROR_CHECK(esp_pm_configure(&pm_config));
 }
